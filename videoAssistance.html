@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Sinch Video Assistance</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <script src="https://cdn.sinch.com/latest/sinch-rtc-min.js"></script>
+
+  <style>
+  
+	@font-face {
+		font-family: 'Host Grotesk';
+		font-style: normal;
+		font-weight: 400;
+		src: url(https://sinch.com/wp-content/plugins/sinch-core/assets/fonts/host-grotesk-regular.woff2) format('woff2');
+		font-display: optional;
+	}
+	html, body {
+		font-family: 'Host Grotesk', sans-serif;
+	}
+	body {
+		background-color: rgba(247, 249, 250, var(--sinch-bg-opacity, 1)) !important;
+
+		background-image: radial-gradient(
+			circle at -530px -590px,
+			rgba(255, 233, 122, 0.45),
+			rgba(255, 233, 122, 0) 70%
+		);
+
+		background-repeat: no-repeat;
+		background-size: 1000px 1000px;
+	}
+	@media (max-width: 768px) {
+		body {
+			background-image: radial-gradient(
+				circle at -50px -50px,   /* Smaller offset for smaller screens */
+				rgba(255, 233, 122, 0.95), /* Slightly softer glow */
+				rgba(255, 233, 122, 0) 80%
+			);
+
+			background-size: 100px 100px;  /* Smaller gradient to fit screen */
+		}
+	}
+	.centered {
+		text-align: center;
+		padding: 1rem;
+    }
+	.hidden {
+	  opacity: 0;
+	  pointer-events: none;
+	  transition: opacity 0.5s ease;
+	}
+	button {
+		background-color: #1860F0;
+		margin: 0.5rem;
+		border: 0;
+		padding: 1rem;
+		border-radius: 1rem;
+		width: 100%;
+		color: white;
+		font-size: 16px;
+		cursor: pointer;
+		transition: color .2s ease-in-out, background-color .2s ease-in-out, border-color .2s ease-in-out, box-shadow .2s ease-in-out, outline .2s ease-in-out, outline-offset .2s ease-in-out;
+	}
+	button:hover {
+		background-color: #2977FF;
+	}
+	button:disabled {
+		background-color: lightgray;
+	}
+	.material-icons {
+		font-size: 1.5rem;
+	}
+	.cameraControlButton {
+		position: fixed;
+		width: 40px;
+		height: 40px;
+		z-index: 20;
+		padding: 0;
+	}
+	#video {
+		position: fixed;
+		inset: 0;
+		width: 100%;
+		height: 100vh;
+		height: 100dvh;
+		object-fit: contain;
+		z-index: 10;
+	}
+	#endVideoBtn {
+		top: 10px;
+		right: 10px;	
+	}
+	#logo {
+		position: fixed;
+		top: 10px;
+		right: 10px;
+		width: 4rem;
+	}
+	.loader-overlay {
+		position: fixed;
+		inset: 0;
+		display: none;
+		align-items: center;
+		justify-content: center;
+		backdrop-filter: blur(3px);
+		z-index: 9999;
+	}
+	.loader-overlay.active {
+		display: flex;
+	}
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}	
+	.spinner {
+		width: 48px;
+		height: 48px;
+		border: 4px solid rgba(0, 0, 0, 0.1);
+		border-top: 4px solid rgba(255, 233, 122, 1);
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}	
+  </style>
+</head>
+<body>
+	<! -- Loader animation -->
+	<div id="loader" class="loader-overlay">
+	  <div class="spinner"></div>
+	</div>
+	
+	<! -- Welcome section -->
+	<section id="welcomeContainer" class="centered">
+		<img id="logo" src="https://sinch.com/wp-content/themes/simpletexting-theme-blank/assets/images/logo-sinch.svg" />
+		<h1>Hi!</h1>
+		<h3>You've been invited to a video assistance session.</h3>
+		<p>Video assistance uses your camera to send a live stream to our customer representative. Please click below to start.</p>
+		<p>If asked, please allow us to use your camera 🙏</p>
+		<button id="startBtn">Start</button>
+	</section>
+	
+	<! -- If there are issues starting SinchClient or setting up SDK -->
+	<section id="startErrorContainer" class="centered hidden">
+		<img id="logo" src="https://sinch.com/wp-content/themes/simpletexting-theme-blank/assets/images/logo-sinch.svg" />
+		<h1>Oh no!</h1>
+		<p>We're having trouble starting video. Please request a new invitation from our customer representative and try again.</p>
+	</section>
+	
+	<! -- If user didn't grant camera or microphone permission -->
+	<section id="permissionsMissingContainer" class="centered hidden">
+		<img id="logo" src="https://sinch.com/wp-content/themes/simpletexting-theme-blank/assets/images/logo-sinch.svg" />
+		<h1>Hmm...</h1>
+		<p>It seems we don't have permission to use camera or microphone.</p>
+		<p>To work properly, video assistance needs both 😊</p>
+		<p>Please check your browser settings, and reload the page to try again.</p>
+	</section>			
+	
+	<! -- Camera selection section -->
+	<section id="cameraSelectContainer" class="centered hidden">
+		<img id="logo" src="https://sinch.com/wp-content/themes/simpletexting-theme-blank/assets/images/logo-sinch.svg" />
+		
+		<! -- New session -->
+		<div id="cameraSelectNewSession">
+			<h1>Choose camera</h1>
+			<p>Next, please select which camera you'd like to use for sending video to our customer representative.</p>
+			<p>If asked, please also allow us to use your microphone. This is just a technicality. Your voice will not be sent.</p>
+			<p>Please keep the original phone call active in the background, and perhaps turn on the speaker 🔊</p>
+		</div>
+		
+		<! -- Session paused (videocall ended) - Customer might be able to resume session with new video call. -->
+		<div id="cameraSelectPausedSession" class="hidden">
+			<h1>Session paused</h1>
+			<h3 id="callEndedReason" class="hidden"></h3>
+			<p id="callEndedText"></p>
+		</div>
+		<button id="startBackCameraBtn">Start with back camera</button>
+		<button id="startFrontCameraBtn">Start with front (selfie) camera</button>
+		
+		
+		<! -- Device list for debugging. -->
+		<ul id="deviceList"></ul>
+	</section>
+	
+	<! -- NoAnwswer section (SDK indicates NoAnswer from agent-side SDK client - this can happen for various reasons) -->
+	<section id="noAnswerContainer" class="centered hidden">
+		<img id="logo" src="https://sinch.com/wp-content/themes/simpletexting-theme-blank/assets/images/logo-sinch.svg" />
+		<h1>Oh no!</h1>
+		<p>We're having trouble starting video. Please request a new invitation from our customer representative and try again.</p>
+	</section>			
+	
+	<! -- Ended session section (customer representative has ended the session, and new videocall cannot be made without new invitation) -->
+	<section id="sessionEndedContainer" class="centered hidden">
+		<img id="logo" src="https://sinch.com/wp-content/themes/simpletexting-theme-blank/assets/images/logo-sinch.svg" />
+		<h1>Session ended</h1>
+		<p>Thank you for using video assistance! 🤝</p>
+	</section>		
+  
+	<! -- Video controls -->
+	<section id="videoControlsContainer" class="hidden">
+		<video id="video" playsinline></video>
+
+		<button id="endVideoBtn" class="cameraControlButton">
+			<span class="material-icons" translate="no">close</span>
+		</button>
+	</section>
+
+<script>
+
+	// DOM elements.
+	// Welcome section:
+	const welcomeContainer = document.getElementById('welcomeContainer');
+	const startBtn = document.getElementById("startBtn");
+	// Camera select section:
+	const cameraSelectContainer = document.getElementById('cameraSelectContainer');
+	const cameraSelectNewSession = document.getElementById('cameraSelectNewSession');
+	const cameraSelectPausedSession = document.getElementById('cameraSelectPausedSession');	
+	const startBackCameraBtn = document.getElementById("startBackCameraBtn");
+	const startFrontCameraBtn = document.getElementById("startFrontCameraBtn");
+	// Video controls section:
+	const videoControlsContainer = document.getElementById('videoControlsContainer');
+	const videoElement = document.getElementById('video');
+	const endVideoBtn = document.getElementById('endVideoBtn');
+	// Video call paused section:
+	const callEndedReasonSpan = document.getElementById('callEndedReason');
+	const callEndedTextP = document.getElementById('callEndedText');
+	
+	// URL parameters.
+	const params = new URLSearchParams(document.location.search);
+	const userId = params.get("userId");
+	const agentId = params.get("callee");
+	const token = params.get("token");
+	const appKey = params.get("app");
+	const debug = params.get("debug");
+	if (!debug && (!userId || !agentId || !token || !appKey)) {
+		startBtn.disabled = true;
+	}
+	
+	// State variables.
+	let videoCall = null;
+	let currentFacingMode = "environment";
+
+	let callId = null;	let frontCameraId = null;
+	let backCameraId = null;
+	let useBackCamera = true;
+	let frontCameraIndex = 0;
+	let backCameraIndex = 0;
+	let customerEndedVideoCall = false;
+	
+	// Disable start buttons initially.
+	startBackCameraBtn.disabled = true;
+	startFrontCameraBtn.disabled = true;
+
+	// Setup and build SinchClient.
+	let sinchClient = null;
+	if (appKey && userId) {
+		sinchClient = Sinch.getSinchClientBuilder()
+			.applicationKey(appKey)
+			.environmentHost("ocra.api.sinch.com")
+			.userId(userId)
+			.build();
+	}
+		
+	// Loader animation.
+	function showLoader() {
+		document.getElementById('loader').classList.add('active');
+	}
+	function hideLoader() {
+		document.getElementById('loader').classList.remove('active');
+	}
+	
+	// Navigates to section.
+	function showSection(section) {
+		const sections = document.querySelectorAll("section");
+		sections.forEach(sec => {
+			if (sec.id === section) {
+				sec.style.display = "block";
+				setTimeout(() => {
+					sec.classList.remove("hidden");
+				},500);
+			} else {
+				sec.classList.add("hidden");
+				setTimeout(() => {
+					sec.style.display = "none";
+				},500);
+			}
+		});	
+	}
+	
+	/**
+	 * Returns a usable camera deviceId for a given facingMode.
+	 * Automatically requests permission first.
+	 * @param {"user"|"environment"} facingMode
+	 * @returns {Promise<string|null>}
+	 */
+	async function getCameraDeviceId(facingMode) {
+	  try {
+		// Request permission (required on iOS/Android for labels/facingMode)
+		const permissionStream = await navigator.mediaDevices.getUserMedia({ video: true });
+		permissionStream.getTracks().forEach(t => t.stop());
+
+		const devices = await navigator.mediaDevices.enumerateDevices();
+		const cameras = devices.filter(d => d.kind === "videoinput");
+
+		// Try to find camera that reports the requested facingMode
+		for (const cam of cameras) {
+		  try {
+			const testStream = await navigator.mediaDevices.getUserMedia({
+			  video: { deviceId: { exact: cam.deviceId } }
+			});
+			const track = testStream.getVideoTracks()[0];
+			const settings = track.getSettings();
+			track.stop();
+
+			if (settings.facingMode === facingMode) {
+			  return cam.deviceId;
+			}
+		  } catch (e) {
+			// Ignore cameras that cannot be opened
+		  }
+		}
+
+		// Fallback: first device = front, last device = back
+		if (cameras.length > 0) {
+		  return facingMode === "user" ? cameras[0].deviceId : cameras[cameras.length - 1].deviceId;
+		}
+
+		return null;
+	  } catch (err) {
+		console.error("Camera permission or enumeration failed:", err);
+		return null;
+	  }
+	}
+	
+	/**
+	 * Returns true or false depending if user granted microphone permission.
+	 * Automatically requests permission.
+	 * @returns {Promise<boolean>}
+	 */
+	async function requestMicrophonePermission() {
+		if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+			console.warn("getUserMedia not supported in this browser");
+			return false;
+		}
+		try {
+			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+			// Stop the tracks immediately; we just needed permission
+			stream.getTracks().forEach(track => track.stop());
+			return true;
+		} catch (err) {
+			console.warn("Microphone permission denied or error:", err);
+			return false;
+		}
+	}
+
+	// Ends video call.
+	async function startVideoCall () {
+		const microphonePermission = await requestMicrophonePermission();
+		if (!microphonePermission) {
+			showSection("permissionsMissingContainer");
+			return;
+		}
+		startBackCameraBtn.disabled = true;
+		startFrontCameraBtn.disabled = true;
+		showLoader();
+		if (sinchClient) {
+			sinchClient.start();
+		} else {
+			setTimeout(() => {
+				hideLoader();
+				startBackCameraBtn.disabled = false;
+				startFrontCameraBtn.disabled = false;
+			},1000);
+		}
+	
+	}		
+
+	// Ends video call.
+	function endVideoCall () {
+	  if (videoCall) {
+		customerEndedVideoCall = true;
+		videoCall.hangup();
+	  }
+	}
+	
+	// Check if token belongs to an already ended session.
+	if (localStorage.getItem("endedSessionToken") === token) {
+		showSection("sessionEndedContainer");
+	}
+	
+	// Add SinchClient listeners.
+	if (sinchClient) {
+		sinchClient.addListener({
+			onClientStarted: async (sinchClient) => {
+				// Get callClient.
+				const callClient = sinchClient.callClient;
+				
+				// Default to back camera.
+				callClient.setVideoTrackConstraints({
+					deviceId: { exact: useBackCamera ? backCameraId : frontCameraId }
+				});	
+
+				// Start the video call.
+				videoCall = await callClient.callUserVideo(agentId);
+				callId = videoCall.id;
+				
+				// Assign the outgoing stream immediately
+				videoElement.srcObject = videoCall.outgoingStream;
+				videoElement.autoplay = true;
+				videoElement.playsInline = true;
+				videoElement.setAttribute("playsinline", "");
+				videoElement.setAttribute("webkit-playsinline", "");
+				
+				// Wait until the call is established to show the video
+				videoCall.addListener({
+					onCallEstablished: async () => {
+						hideLoader();
+						showSection("videoControlsContainer");
+						try {
+							await videoElement.play();
+							videoCall.outgoingStream.getAudioTracks().forEach(track => {
+								track.enabled = false;
+							});						
+						} catch (err) {
+							console.warn("Video autoplay failed:", err);
+						}
+					},
+					onCallProgressing: () => {
+						console.log("Call is ringing / connecting...");
+					},
+					onRemoteStreamAdded: (remoteStream) => {
+						console.log("Remote stream added, but ignoring...");
+					},
+					onCallEnded: (call) => {
+						hideLoader();
+						const callEndCause = call.details.endCause; // https://download.sinch.com/js/latest/reference/enums/CallEndCause.html
+						if (callEndCause === 5 && !customerEndedVideoCall) {
+							// Agent ended session, and it cannot be resumed.
+							localStorage.setItem("endedSessionToken", token);
+							showSection("sessionEndedContainer");
+						} else if (callEndCause === 3) {
+							// No answer from agent-side SDK, session cannot be resumed.
+							showSection("noAnswerContainer");
+						} else {
+							// In any other case customer may try resuming session.
+							if (customerEndedVideoCall) {
+								// If customer ended video call (paused session) intentionally.
+								callEndedReasonSpan.innerText = "";
+								callEndedReasonSpan.classList.add("hidden");
+								callEndedTextP.innerText = "You can resume by selecting a camera below.";
+							} else {
+								// If customer didn't end the video call intentionally, provide error code on screen.
+								let callEndReason = "";
+								switch (callEndCause) {
+									case 0: callEndReason = "None"; break;
+									case 1: callEndReason = "Timeout"; break;
+									case 2: callEndReason = "Denied"; break;
+									case 3: callEndReason = "NoAnswer"; break;
+									case 4: callEndReason = "Failure"; break;
+									case 5: callEndReason = "HungUp"; break;
+									case 6: callEndReason = "Canceled"; break;
+									case 7: callEndReason = "OtherDeviceAnswered"; break;
+								}
+								callEndedReasonSpan.innerText = callEndReason;
+								callEndedReasonSpan.classList.remove("hidden");
+								callEndedTextP.innerText = "Looks like we encountered an error, and video was stopped. You can try to resume by selecting a camera below.";
+							}
+							// Show camera selection buttons.
+							startBackCameraBtn.disabled = false;
+							startFrontCameraBtn.disabled = false;
+							cameraSelectNewSession.style.display = "none";
+							cameraSelectPausedSession.style.display = "inline-block";
+							showSection("cameraSelectContainer");
+							cameraSelectPausedSession.classList.remove("hidden");
+						}
+						// Reset flag.
+						customerEndedVideoCall = false;
+					}
+				});
+			},
+			onClientFailed: (client, error) => {
+				console.warn('SinchClient failed to start');
+				showSection("startErrorContainer");
+				hideLoader();
+			},
+			onCredentialsRequired: (sinchClient, clientRegistration) => {
+				if (token) {
+					clientRegistration.register(token);
+				}
+			}
+		});
+	}
+	// Add button listeners.
+	startBtn.addEventListener("click", async () => {
+		showLoader();
+		frontCameraId = await getCameraDeviceId("user");
+		backCameraId = await getCameraDeviceId("environment");
+		startFrontCameraBtn.disabled = frontCameraId === null;
+		startBackCameraBtn.disabled = backCameraId === null;
+		if (frontCameraId === null && backCameraId === null) {
+			showSection("permissionsMissingContainer");
+			hideLoader();
+		} else {
+			cameraSelectPausedSession.style.display = "none";
+			hideLoader();
+			showSection("cameraSelectContainer");
+		}
+	});	
+	startBackCameraBtn.addEventListener("click", async () => {
+		useBackCamera = true;
+		startVideoCall();
+	});
+	startFrontCameraBtn.addEventListener("click", async () => {
+		useBackCamera = false;
+		startVideoCall();
+	});
+	endVideoBtn.addEventListener("click", async () => {
+		endVideoCall();
+	});
+	
+	// Add page visibility listener.
+	window.addEventListener("beforeunload", endVideoCall);
+	window.addEventListener("pagehide", endVideoCall);
+	
+	// Monitor for network connectivity changes.
+	window.addEventListener("offline", () => {
+		showLoader();
+	});
+	window.addEventListener("online", () => {
+		hideLoader();
+	});
+	
+</script>
+
+</body>
+</html>
