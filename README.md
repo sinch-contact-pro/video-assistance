@@ -1,2 +1,2 @@
-# video-assistance
-Reference implementation for Video Assistance customer-facing UI
+# Video Assistance
+### Reference implementation for Video Assistance customer-facing UI
