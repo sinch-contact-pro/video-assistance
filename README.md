@@ -11,7 +11,9 @@ Video assistance session is established on top of an ongoing traditional phone c
 
 In a video assistance session, only the customer is sharing their camera feed, using either back or front camera. Customer can pause the video, and switch between cameras (front/back) if needed. This feature works on all of the most common mobile web browsers, and does not require a separate app to be installed.
 
-In a video assistance session, only the customer is sending their camera feed, using either the back or front camera. If the underlying phone call ends, video assistance session is also ended automatically. If customer switches to any other app or closes browser, video stream is stopped to ensure privacy. In other words, video is sent only while customer sees the video assistance UI on screen.
+If customer switches to any other app or closes browser, video stream is stopped to ensure privacy. In other words, video is sent only while customer actually sees the video assistance UI on screen. If customer accidentally closes their browser, they can re-establish session by re-opening the link as long as the underlying phone call is still ongoing.
+
+When the underlying phone call ends, video assistance session is also ended automatically. Agent can also end video assistance session separately, while still keeping the phone call active. Agent can also send multiple invitations within scope of one phone call, should that be needed.
 
 ## Requirements & Configuration
 - Feature available starting from Sinch Contact Pro cloud release 26Q2.
